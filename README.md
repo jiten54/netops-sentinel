@@ -1,267 +1,301 @@
-# NetOps Sentinel — Network Operations Automation & Observability Platform
+# NetOps Sentinel
+<img width="1912" height="853" alt="Screenshot 2026-10-15 063544" src="https://github.com/user-attachments/assets/6c31041e-76c8-4f75-88e3-94b34b89df29" />
+<img width="1906" height="873" alt="Screenshot 2026-10-15 063634" src="https://github.com/user-attachments/assets/7e3ed5ff-6bdd-4368-bbce-221f05883699" />
+<img width="1905" height="861" alt="Screenshot 2026-10-15 063711" src="https://github.com/user-attachments/assets/927fd9db-a440-4496-8262-712097c4243f" />
 
-[![CI/CD Pipeline](https://github.com/akamai-reliability/netops-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/akamai-reliability/netops-sentinel)
-[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Target Role](https://img.shields.io/badge/Akamai%20Job%20ID-4073%20(Software%20Engineer)-orange.svg)](https://www.akamai.com/careers)
+### Network Operations Automation & Observability Platform
 
-**NetOps Sentinel** is a production-grade, distributed network operations automation, probe observability, Linux systems diagnostic, and safe remediation platform specifically tailored to the **Akamai Software Engineer (Job ID 4073)** requirements.
+A production-style network operations platform built with Python, FastAPI, Linux, and React to monitor service health, diagnose failures, correlate incidents, and execute controlled recovery workflows.
 
-It continuously inspects critical distributed edge services, records sub-millisecond network timings (DNS resolution, TCP 3-way handshake, TLS certificate expiry, and TTFB), aggregates consecutive health check failures into evidence-correlated Incidents, provides an allowlisted automated remediation runner with RBAC and cooldown safeguards, exports Prometheus metrics, and delivers a dark-mode Network Operations Center (NOC) cockpit.
+**Focus areas:** Network Monitoring · Linux Diagnostics · Incident Management · Safe Automation · Observability · Reliability Engineering
 
 ---
 
-## 🏛️ System Architecture
+## Overview
+
+NetOps Sentinel provides a centralized Network Operations Center (NOC) for monitoring network services and investigating operational failures.
+
+The platform combines active network probes, Linux system diagnostics, incident correlation, safe remediation, and Prometheus metrics in a unified dashboard.
+
+It is designed to demonstrate practical software engineering concepts relevant to distributed systems, network operations, automation, and reliable service delivery.
+
+## Key Features
+
+### Network Health Monitoring
+- HTTP and HTTPS endpoint monitoring.
+- DNS resolution and TCP connectivity checks.
+- Response-time measurement and latency analysis.
+- TLS certificate validity and expiration checks.
+- Configurable timeouts, failure thresholds, and retry policies.
+- Service health states: `HEALTHY`, `DEGRADED`, `DOWN`, and `UNKNOWN`.
+
+### Linux System Diagnostics
+- CPU utilization and load averages.
+- Memory and disk usage.
+- Process-level resource information.
+- Network interface inspection.
+- Bash-based diagnostic and health-check scripts.
+- Container and host environment identification.
+
+### Incident Detection and Investigation
+- Threshold-based incident creation.
+- Consecutive-failure detection.
+- Incident deduplication and timeline tracking.
+- Evidence-based probable-cause classification.
+- Incident status transitions and resolution history.
+
+### Safe Remediation Engine
+- Allowlisted recovery actions.
+- Role-based authorization for administrative operations.
+- Dry-run support and cooldown protection.
+- Recovery execution logs and audit history.
+- Post-recovery health verification.
+- Protection against arbitrary shell-command execution.
+
+### Observability
+- Prometheus-compatible metrics at `/metrics`.
+- Structured application logging.
+- Correlation IDs for request and probe tracing.
+- Service availability and latency metrics.
+- Incident and recovery statistics.
+
+### Operations Dashboard
+- Service health overview and monitoring controls.
+- Incident investigation and event timelines.
+- Linux diagnostics interface.
+- Remediation execution console.
+- Chaos simulation for controlled failure scenarios.
+- Prometheus metrics viewer.
+
+---
+
+## Technology Stack
+
+| Component | Technologies |
+|---|---|
+| Backend | Python, FastAPI, Pydantic, Uvicorn |
+| Network Probes | HTTPX, TCP sockets, DNS resolution, TLS inspection |
+| System Diagnostics | Linux, Bash, psutil |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, Recharts |
+| Database | PostgreSQL, SQLAlchemy |
+| Observability | Prometheus, structured logging |
+| Infrastructure | Docker, Docker Compose |
+| Testing | Python unittest/pytest-compatible test workflows |
+| CI/CD | GitHub Actions |
+
+*Verify the final dependencies and supported commands against the repository before publishing.*
+
+---
+
+## Architecture
 
 ```mermaid
-graph TD
-    subgraph Edge Layer & Probing Targets
-        GW[Edge Gateway US-East: 3000/443]
-        DNS_RESOLV[Anycast DNS Resolver: 53/853]
-        AUTH[Edge Token Validator: 443]
-        PURGE[Fast Purge API: 443]
-        CANARY[Controlled Test Canary: 8080]
-    end
-
-    subgraph NetOps Sentinel Core Platform
-        WORKER[Asynchronous Probe Worker Daemon<br/>(SIGINT/SIGTERM Graceful Shutdown)]
-        API[FastAPI Application Server<br/>(Correlation ID Middleware, REST API v1)]
-        INCIDENT[Incident Detection & Root Cause Engine<br/>(Consecutive Failure Gating, Evidence Correlation)]
-        RECOVERY[Safe Remediation Engine<br/>(Allowlist Registry, RBAC, Cooldown, Post-Probe Verifier)]
-        DIAG[Linux System Diagnostics<br/>(Procfs, Load Average, Container Isolation)]
-    end
-
-    subgraph Persistence & Observability
-        DB[(PostgreSQL 16 / SQLite<br/>Alembic Migrations)]
-        PROM[Prometheus Scraper<br/>(/metrics Endpoint)]
-    end
-
-    subgraph Operator Console
-        UI[React 19 + TypeScript + Tailwind CSS<br/>NOC Operations Dashboard]
-    end
-
-    WORKER -->|HTTP / TCP / DNS / TLS Probes| GW
-    WORKER -->|DNS Queries & TCP Check| DNS_RESOLV
-    WORKER -->|TLS Handshake Inspection| AUTH
-    WORKER -->|HTTP Latency TTFB| PURGE
-    WORKER -->|Controlled Canary Probing| CANARY
-
-    WORKER -->|Feed Raw Results| INCIDENT
-    INCIDENT -->|Create / Deduplicate Incidents| DB
-    WORKER -->|Persist Probe Metrics| DB
-    DIAG -->|Kernel /proc Telemetry| WORKER
-
-    API -->|Read Telemetry & Incidents| DB
-    API -->|Expose Metrics| PROM
-    UI -->|REST v1 /api/v1/*| API
-    UI -->|Trigger Remediations| RECOVERY
-    RECOVERY -->|Post-Recovery Health Verification| WORKER
+flowchart TD
+    A[Monitored Services] --> B[Network Probe Engine]
+    C[Linux Diagnostics] --> D[Monitoring Worker]
+    B --> D
+    D --> E[Health Evaluation]
+    E --> F[Incident Engine]
+    F --> G[Safe Remediation Engine]
+    G --> H[Post-Recovery Verification]
+    H --> F
+    D --> I[Prometheus Metrics]
+    F --> J[(PostgreSQL)]
+    G --> J
+    I --> K[Operations Dashboard]
+    J --> L[FastAPI Backend]
+    L --> K
 ```
 
----
-
-## 🎯 Akamai Job ID 4073 Competency Alignment
-
-| Akamai Requirement | NetOps Sentinel Implementation | Verification / Code Path |
-| :--- | :--- | :--- |
-| **Python Programming & Systems** | Python 3.12+, FastAPI, Pydantic v2 schemas, SQLAlchemy 2.0 ORM, async monitoring worker. | `backend/main.py`, `backend/prober.py`, `worker/monitoring_worker.py` |
-| **Networking Protocols (HTTP, DNS, TCP, TLS)** | Multi-stage low-level network checks: DNS resolution timing, TCP connect handshake latency, TLS X.509 certificate expiry & cipher inspection, HTTP TTFB. | `backend/prober.py`, `scripts/network_probe.sh` |
-| **Linux/Unix Systems & Shell Scripting** | Production Bash diagnostic scripts parsing `/proc/stat`, `/proc/loadavg`, `/proc/meminfo`, memory, disk utilization, and distinguishing container sandbox from host. | `scripts/diagnostics.sh`, `backend/diagnostics.py` |
-| **Distributed Systems & Autonomous Workers** | Standalone worker daemon operating independently of frontend availability with graceful signal handling (`SIGINT`, `SIGTERM`). | `worker/monitoring_worker.py` |
-| **Incident Engineering & Root Cause Analysis** | Consecutive failure gating, evidence correlation (error code, latency breakdown, IP resolution), automated severity calculation, and timeline audit. | `backend/incident_engine.py` |
-| **Safe Automation & Site Reliability** | Strict allowlisted remediation registry (no arbitrary shell execution), `netops-admin` RBAC check, flapping cooldowns, dry-run simulation, and automated post-recovery probe verification. | `backend/recovery_engine.py` |
-| **Observability & Metrics** | Prometheus-compatible `/metrics` exposition, structured JSON logging, and correlation ID (`X-Correlation-ID`) tracking. | `/metrics`, `backend/main.py` middleware, `prometheus.yml` |
-| **Deployment & Containers** | Multi-container Docker Compose with PostgreSQL 16, backend, worker, testservice, Prometheus, and frontend. | `docker-compose.yml`, `Dockerfile` |
+The monitoring worker operates independently of the frontend. The backend exposes operational data and management APIs, while the dashboard provides a centralized interface for investigation and recovery.
 
 ---
 
-## ⚡ Quickstart & Deployment
+## Dashboard Screenshots
 
-### Option 1: Multi-Container Deployment via Docker Compose
+Add your actual screenshots to a `docs/screenshots/` directory and update the filenames below.
 
-Run the complete multi-container stack (Database, FastAPI Server, Worker, Prometheus, Controlled Test Service, and React Frontend):
+### Services Health
+
+![NetOps Sentinel Services Health Dashboard](docs/screenshots/services-health.png)
+
+### Linux Diagnostics
+
+![NetOps Sentinel Linux Diagnostics](docs/screenshots/linux-diagnostics.png)
+
+### Remediation Engine
+
+![NetOps Sentinel Remediation Console](docs/screenshots/remediation-engine.png)
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Git
+- Docker Engine or Docker Desktop
+- Docker Compose v2
+
+Python and Node.js are also useful for running individual components outside containers.
+
+### Installation
+
+Clone the repository:
 
 ```bash
-# Clone the repository
-git clone https://github.com/akamai-reliability/netops-sentinel.git
+git clone https://github.com/jiten54/netops-sentinel.git
 cd netops-sentinel
+```
 
-# Launch all services
+Review the available configuration files, including `.env.example` and `.env.docker.example`, if present. Configure the required environment variables according to the repository's deployment instructions.
+
+Start the application:
+
+```bash
 docker compose up --build
 ```
 
-**Port Mappings:**
-- **Operations Dashboard (React/Vite)**: `http://localhost:3000`
-- **FastAPI Backend Server**: `http://localhost:8000` (Docs at `/docs`)
-- **Prometheus Metrics**: `http://localhost:8000/metrics`
-- **Prometheus UI**: `http://localhost:9090`
-- **Controlled Test Canary**: `http://localhost:8080`
-- **PostgreSQL Database**: `localhost:5432`
+Wait for the services to become healthy before opening the dashboard.
 
----
+### Access the Services
 
-### Option 2: Local Development Setup (Node + Python)
+Use the actual port mappings configured in `docker-compose.yml`.
 
-```bash
-# 1. Install Node.js dependencies
-npm install
+| Service | Typical local URL |
+|---|---|
+| Frontend dashboard | `http://localhost:5173` |
+| FastAPI backend | `http://localhost:8000` |
+| API documentation | `http://localhost:8000/docs` |
+| Prometheus metrics | `http://localhost:8000/metrics` |
+| Prometheus interface | `http://localhost:9090` |
 
-# 2. Run the automated Python unit test suite
-python3 -m unittest discover -s tests -p 'test_*.py' -v
+These are example URLs; confirm the exposed ports in your Compose configuration.
 
-# 3. Start the full-stack server
-npm run dev
-# Dashboard launches at http://localhost:3000
-```
-
----
-
-## 🧪 Automated Testing & Failure Simulation
-
-### Running Backend Unit Tests
-
-The test suite validates network probe failure modes, incident grouping, consecutive failure thresholds, security allowlist enforcement, and cooldowns:
+### Stop the Application
 
 ```bash
+docker compose down
+```
+
+To remove the associated database volume and reset persisted data, review the Compose volume configuration before running:
+
+```bash
+docker compose down -v
+```
+
+**Warning:** Removing volumes deletes persisted application data.
+
+---
+
+## Running Tests
+
+Run the test suite using the command supported by the repository:
+
+```bash
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-**Sample Output:**
-```
-test_chaos_simulation_modes (tests.test_network_probes.TestNetworkProber) ... ok
-test_dns_resolution_failure (tests.test_network_probes.TestNetworkProber) ... ok
-test_tcp_connection_refused (tests.test_network_probes.TestNetworkProber) ... ok
-test_automated_recovery_resolution_after_consecutive_successes (tests.test_incident_engine.TestIncidentEngine) ... ok
-test_consecutive_failures_triggers_incident (tests.test_incident_engine.TestIncidentEngine) ... ok
-test_incident_grouping_aggregates_repeated_failures (tests.test_incident_engine.TestIncidentEngine) ... ok
-test_single_failure_does_not_prematurely_create_incident (tests.test_incident_engine.TestIncidentEngine) ... ok
-test_arbitrary_unallowlisted_action_rejected (tests.test_recovery_actions.TestRecoveryEngine) ... ok
-test_authorized_recovery_with_post_verification (tests.test_recovery_actions.TestRecoveryEngine) ... ok
-test_cooldown_enforcement (tests.test_recovery_actions.TestRecoveryEngine) ... ok
-test_dry_run_simulation (tests.test_recovery_actions.TestRecoveryEngine) ... ok
-test_unauthorized_role_rejected (tests.test_recovery_actions.TestRecoveryEngine) ... ok
-----------------------------------------------------------------------
-Ran 12 tests in 0.308s
-OK
-```
+The current project-generation report records **12 passing tests** covering network probe failures, incident handling, remediation authorization, cooldowns, dry-run behavior, and recovery verification.
+
+Re-run the tests in your final repository before treating this result as verified.
 
 ---
 
-## 🔬 Repeatable Reviewer Walkthrough: Failure, Investigation & Recovery
+## Failure Simulation
 
-Reviewers can verify the complete end-to-end reliability loop in under 2 minutes:
+Use the controlled Chaos Simulator to demonstrate the incident lifecycle in a local test environment.
 
-1. **Open the Operations Dashboard** at `http://localhost:3000`.
-2. Navigate to the **Chaos Simulator** tab.
-3. Select **Controlled Test Service (Canary Target)** and choose **TCP SYN Drop (Connection Refused)**.
-4. Click **Arm & Trigger Failure Now**:
-   - The probe immediately fails with `TCP_CONNECTION_REFUSED`.
-   - The service turns **DOWN**.
-5. Switch to the **Incidents** tab:
-   - Notice an Incident is generated: `Degradation on Controlled Test Service [TCP_CONNECTION_REFUSED]`.
-   - Review the evidence-backed probable cause (e.g. 98% confidence).
-   - Click **Acknowledge** to assign the incident to active investigation.
-6. Click **Remediate** (or switch to the **Remediation Engine** tab):
-   - Notice the allowlisted action: `restart_controlled_service`.
-   - Click **Execute Authorized Remediation**.
-7. Observe the **Remediation Execution Terminal**:
-   - Process drains TCP buffer, restarts worker container replica.
-   - An automated post-recovery probe runs immediately to verify reachability.
-   - The post-state returns `HEALTHY`.
-   - The incident automatically transitions to **RESOLVED** with an immutable timeline audit record!
+1. Select a supported failure scenario, such as an HTTP error or elevated latency.
+2. Trigger the failure against a controlled test service.
+3. Observe the health-check results and incident creation.
+4. Inspect the recorded diagnostics and probable-cause evidence.
+5. Select an authorized, allowlisted remediation action.
+6. Review the execution logs and post-recovery health checks.
+7. Confirm that the incident resolves only after the configured verification conditions are satisfied.
+
+Only simulate failures against services you own or are authorized to test.
 
 ---
 
-## 🔒 Security Architecture & Guardrails
+## Security Considerations
 
-- **Zero Arbitrary Execution**: The remediation runner disallows execution of arbitrary commands, unvetted scripts, or destructive host operations. Only allowlisted actions (`restart_controlled_service`, `flush_dns_cache`, `rotate_tls_cert`, `reset_circuit_breaker`, `scale_test_replica`, `isolate_flapping_route`) can be invoked.
-- **Role-Based Access Control (RBAC)**: All remediation operations require the `netops-admin` operator role passed via `X-Operator-Role`. Non-admin requests are rejected with HTTP 403.
-- **Flapping Cooldown Protection**: Rapid remediation loops on the same service are blocked for 30 seconds to prevent cascading routing loops or edge service flapping.
-- **SSRF Protection**: Target hosts are strictly checked against allowed monitoring network scopes.
-- **Audit Logging**: Every remediation invocation records pre-state, post-state, operator, duration, and stdout to the database.
-
----
-
-## 📊 API Reference
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/health/liveness` | Service liveness probe |
-| `GET` | `/health/readiness` | Database connectivity readiness probe |
-| `GET` | `/metrics` | Prometheus text exposition metrics |
-| `GET` | `/api/v1/kpi` | Aggregated NOC operational KPIs |
-| `GET` | `/api/v1/services` | List all monitored edge services |
-| `POST` | `/api/v1/services` | Register a new monitored endpoint |
-| `POST` | `/api/v1/services/{id}/probe` | Trigger an on-demand probe sweep |
-| `GET` | `/api/v1/services/{id}/history` | Historical latency and TLS inspection records |
-| `GET` | `/api/v1/incidents` | List detected incidents with filter |
-| `POST` | `/api/v1/incidents/{id}/acknowledge` | Acknowledge active incident |
-| `POST` | `/api/v1/incidents/{id}/resolve` | Resolve incident with notes |
-| `GET` | `/api/v1/recovery/actions` | List approved allowlisted actions |
-| `POST` | `/api/v1/recovery/execute` | Execute safe automated remediation |
-| `GET` | `/api/v1/recovery/audit` | Query immutable remediation audit log |
-| `GET` | `/api/v1/diagnostics/system` | Linux OS, `/proc`, and process diagnostics |
-| `POST` | `/api/v1/chaos/inject` | Inject controlled network failure mode |
-| `POST` | `/api/v1/chaos/reset` | Clear active chaos failure injections |
+- Use environment variables for credentials and sensitive configuration.
+- Never commit secrets or production credentials.
+- Restrict monitoring targets to approved destinations.
+- Protect administrative actions with authentication and authorization.
+- Use predefined remediation actions instead of arbitrary shell execution.
+- Apply timeouts, retry limits, and cooldowns.
+- Keep recovery actions restricted to controlled test services unless appropriate production safeguards are implemented.
 
 ---
 
-## 📁 Repository Structure
+## Project Structure
 
-```
-.
-├── backend/                  # FastAPI Application & Reliability Modules
-│   ├── config.py             # Pydantic configuration & security allowlists
-│   ├── database.py           # SQLAlchemy database session & baseline seed
-│   ├── diagnostics.py        # Linux procfs and system telemetry collector
-│   ├── incident_engine.py    # Consecutive failure gating & root cause engine
-│   ├── main.py               # FastAPI endpoints, Prometheus, correlation IDs
-│   ├── models.py             # SQLAlchemy ORM models (Services, Probes, Incidents)
-│   ├── prober.py             # Low-level network prober (DNS, TCP, TLS, HTTP)
-│   ├── recovery_engine.py    # Safe allowlisted remediation runner & verifier
-│   └── schemas.py            # Pydantic request/response validation schemas
-├── worker/                   # Independent Autonomous Background Daemon
-│   └── monitoring_worker.py  # Daemon worker with graceful SIGINT/SIGTERM
-├── scripts/                  # Production Linux Shell Scripts
-│   ├── diagnostics.sh        # Linux /proc, CPU, memory, disk, container isolation
-│   ├── health_check.sh       # Endpoint availability & HTTP latency verification
-│   ├── network_probe.sh      # DNS resolution & TCP socket handshake probe
-│   └── chaos_inject.sh       # Chaos fault injection CLI utility
-├── src/                      # React 19 NOC Operations Dashboard
-│   ├── components/           # Modular NOC UI components
-│   │   ├── ChaosSimulator.tsx      # Failure injection & recovery walkthrough
-│   │   ├── DiagnosticsView.tsx     # Linux system & kernel metrics viewer
-│   │   ├── IncidentView.tsx        # Incident investigation & timeline audit
-│   │   ├── KpiStrip.tsx            # Operational health KPI cards
-│   │   ├── PrometheusViewer.tsx    # Live /metrics scrape inspector
-│   │   ├── RecoveryConsole.tsx     # Allowlisted remediation & audit console
-│   │   ├── ServiceInspectorModal.tsx # Deep timing breakdown & TLS inspector
-│   │   ├── ServiceList.tsx         # High-density service health table
-│   │   └── TopNav.tsx              # Top bar contract navigation & RBAC selector
-│   ├── App.tsx               # Main application orchestration & polling
-│   ├── index.css             # Tailwind CSS & tabular typography styling
-│   ├── main.tsx              # React DOM entrypoint
-│   └── types.ts              # Domain TypeScript interfaces
-├── tests/                    # Automated Unit & Failure-Injection Tests
-│   ├── test_network_probes.py      # DNS, TCP handshake, & timeout tests
-│   ├── test_incident_engine.py     # Consecutive failure & grouping tests
-│   └── test_recovery_actions.py    # Allowlist, RBAC, cooldown, & verifier tests
-├── .github/workflows/        # CI/CD Workflows
-│   └── ci.yml                # Python tests, bash validation, & build checks
-├── docker-compose.yml        # Full-stack multi-container orchestrator
-├── Dockerfile                # Backend FastAPI image with networking tools
-├── Dockerfile.frontend       # Frontend Vite preview image
-├── Dockerfile.testservice    # Controlled Canary test service image
-├── Dockerfile.worker         # Autonomous background worker image
-├── prometheus.yml            # Prometheus scrape configuration
-├── requirements.txt          # Python runtime dependencies
-├── server.ts                 # Full-stack Express server mounting Vite SPA
-└── README.md                 # Complete system documentation
+```text
+netops-sentinel/
+├── backend/
+│   ├── config.py
+│   ├── models.py
+│   ├── schemas.py
+│   ├── prober.py
+│   ├── diagnostics.py
+│   ├── incident_engine.py
+│   ├── recovery_engine.py
+│   ├── database.py
+│   └── main.py
+├── worker/
+│   └── monitoring_worker.py
+├── scripts/
+│   ├── diagnostics.sh
+│   ├── health_check.sh
+│   ├── network_probe.sh
+│   └── chaos_inject.sh
+├── src/
+│   ├── components/
+│   ├── App.tsx
+│   └── index.css
+├── tests/
+├── .github/
+│   └── workflows/
+├── Dockerfile
+├── Dockerfile.worker
+├── Dockerfile.frontend
+├── docker-compose.yml
+├── prometheus.yml
+├── requirements.txt
+└── README.md
 ```
 
+Confirm this structure against the final repository and adjust it if any files differ.
+
 ---
 
-## 📄 License
+## Engineering Principles
 
-Licensed under the Apache License, Version 2.0. Tailored for Akamai Network Infrastructure & Reliability Engineering evaluation.
+- Separation of concerns between API, monitoring, diagnostics, and recovery.
+- Observable and testable operational workflows.
+- Evidence-based incident analysis.
+- Controlled automation with auditability.
+- Graceful failure handling and bounded retries.
+- Reproducible development and deployment.
+
+## Future Improvements
+
+- Multi-region monitoring and distributed probe agents.
+- Alert delivery through configurable notification integrations.
+- More advanced anomaly detection for latency and availability.
+- Expanded integration and load testing.
+- Additional authentication and operational audit controls.
+- Improved service-level objective reporting.
+
+## Author
+
+**Jiten Moni Das**
+
+- GitHub: [@jiten54](https://github.com/jiten54)
+- LinkedIn: [Jiten Moni Das](https://linkedin.com/in/jiten-moni-das-01b3a032b/)
+
+---
+
+*NetOps Sentinel is a portfolio project developed to demonstrate network operations, software engineering, Linux diagnostics, automation, and observability concepts. It is not affiliated with or endorsed by Akamai Technologies.*
