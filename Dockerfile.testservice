@@ -1,0 +1,19 @@
+# ==============================================================================
+# NetOps Sentinel — Controlled Test Target Container
+# ==============================================================================
+FROM python:3.12-alpine
+
+WORKDIR /app
+
+RUN echo 'from http.server import HTTPServer, BaseHTTPRequestHandler; import json, sys' > server.py && \
+    echo 'class Handler(BaseHTTPRequestHandler):' >> server.py && \
+    echo '    def do_GET(self):' >> server.py && \
+    echo '        self.send_response(200)' >> server.py && \
+    echo '        self.send_header("Content-Type", "application/json")' >> server.py && \
+    echo '        self.end_headers()' >> server.py && \
+    echo '        self.wfile.write(b"{\"status\":\"HEALTHY\",\"target\":\"controlled-canary-node\"}")' >> server.py && \
+    echo 'HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()' >> server.py
+
+EXPOSE 8080
+
+CMD ["python", "server.py"]

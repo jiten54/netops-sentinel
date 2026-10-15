@@ -1,0 +1,110 @@
+# ==============================================================================
+# NetOps Sentinel — Docker Compose Multi-Container Deployment
+# ==============================================================================
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: netops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: netops
+      POSTGRES_PASSWORD: netops_secure_pass
+      POSTGRES_DB: netops_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netops -d netops_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - netops-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: netops-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://netops:netops_secure_pass@postgres:5432/netops_db
+      PROBE_WORKER_INTERVAL_SEC: 10
+      DEFAULT_PROBE_TIMEOUT_SEC: 5
+      SECRET_KEY: ${SECRET_KEY:-netops_production_key_4073}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/liveness"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - netops-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: netops-worker
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://netops:netops_secure_pass@postgres:5432/netops_db
+      PROBE_WORKER_INTERVAL_SEC: 10
+    networks:
+      - netops-network
+
+  testservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.testservice
+    container_name: netops-testservice
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - netops-network
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: netops-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - netops-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: netops-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - netops-network
+
+volumes:
+  postgres_data:
+
+networks:
+  netops-network:
+    driver: bridge
